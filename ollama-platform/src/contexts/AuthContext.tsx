@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { supabase, isDemoMode } from '@/lib/supabase'
 import { toast } from 'sonner'
 
 interface AuthContextType {
@@ -14,34 +14,95 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Demo user for offline mode
+const DEMO_USER: User = {
+  id: 'demo-user-123',
+  email: 'demo@ollama-platform.com',
+  aud: 'authenticated',
+  role: 'authenticated',
+  created_at: new Date().toISOString(),
+  app_metadata: {},
+  user_metadata: { full_name: 'Demo User' }
+} as User
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Load user on mount (one-time check)
   useEffect(() => {
+    let mounted = true
+    let timeoutId: NodeJS.Timeout
+
     async function loadUser() {
+      // If in demo mode, immediately set demo user
+      if (isDemoMode) {
+        if (mounted) {
+          setUser(DEMO_USER)
+          setLoading(false)
+        }
+        return
+      }
+
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        setUser(user)
-      } catch (error) {
-        console.error('Error loading user:', error)
+        // Set a timeout to prevent infinite loading if Supabase is unavailable
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('Connection timeout')), 5000)
+        })
+
+        const userPromise = supabase.auth.getUser()
+        
+        const { data: { user } } = await Promise.race([
+          userPromise,
+          timeoutPromise
+        ]) as any
+
+        if (mounted) {
+          // If connection failed or no user, use demo user
+          setUser(user || DEMO_USER)
+        }
+      } catch (error: any) {
+        console.warn('Supabase connection failed, running in demo mode:', error.message)
+        // Fallback to demo mode
+        if (mounted) {
+          setUser(DEMO_USER)
+          toast.info('Running in demo mode - full features require Supabase configuration')
+        }
       } finally {
-        setLoading(false)
+        clearTimeout(timeoutId)
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
+    
     loadUser()
 
-    // Set up auth listener - KEEP SIMPLE, avoid any async operations in callback
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        // NEVER use any async operations in callback
-        setUser(session?.user || null)
-        setLoading(false)
+    // Set up auth listener with error handling (skip in demo mode)
+    let subscription: any
+    if (!isDemoMode) {
+      try {
+        const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
+          (_event, session) => {
+            if (mounted) {
+              setUser(session?.user || DEMO_USER)
+              setLoading(false)
+            }
+          }
+        )
+        subscription = sub
+      } catch (error) {
+        console.warn('Auth listener setup failed:', error)
       }
-    )
+    }
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      clearTimeout(timeoutId)
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+    }
   }, [])
 
   // Auth methods

@@ -5,8 +5,9 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/contexts/AuthContext'
-import { Loader2, Zap, Bot, Activity, BarChart3 } from 'lucide-react'
+import { Loader2, Zap, Bot, Activity, BarChart3, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { isDemoMode } from '@/lib/supabase'
 
 export function AuthForm() {
   const { signIn, signUp, resetPassword } = useAuth()
@@ -19,6 +20,12 @@ export function AuthForm() {
     confirmPassword: '',
     fullName: ''
   })
+
+  // Handle demo mode access
+  const handleDemoAccess = () => {
+    // Create a fake user session for demo mode
+    window.location.reload()
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({

@@ -10,12 +10,15 @@ import { AgentList } from '@/components/agents/AgentList'
 import { TemplateGallery } from '@/components/templates/TemplateGallery'
 import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard'
 import { Toaster } from 'sonner'
+import { isDemoMode } from '@/lib/supabase'
+import { AlertCircle, X } from 'lucide-react'
 import './App.css'
 
 function AppContent() {
   const { user, loading } = useAuth()
   const [activeTab, setActiveTab] = useState('dashboard')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [showDemoBanner, setShowDemoBanner] = useState(isDemoMode)
 
   if (loading) {
     return (
@@ -75,6 +78,33 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex flex-col">
       <Header />
+      
+      {/* Demo Mode Banner */}
+      {showDemoBanner && (
+        <div className="bg-amber-500/20 border-b border-amber-500/50 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-400" />
+            <p className="text-sm text-amber-100">
+              <strong>Demo Mode:</strong> Supabase is not configured. The app is running with limited functionality. 
+              <a 
+                href="https://github.com/youragenticdude/ollama-platform-gui#-local-development" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-2 underline hover:text-amber-200"
+              >
+                Learn how to set up →
+              </a>
+            </p>
+          </div>
+          <button
+            onClick={() => setShowDemoBanner(false)}
+            className="text-amber-100 hover:text-amber-200 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
         <Sidebar 
           isCollapsed={sidebarCollapsed}
